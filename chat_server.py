@@ -2,6 +2,7 @@ import socket, threading, select
 
 address = ('', 9009)
 quit_msg = '#Q#'
+nick_UDP_msg = '#N#'
 
 # TCP socket
 TCP_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -13,12 +14,13 @@ UDP_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 UDP_socket.bind(address)
 
 print('Waiting for clients')
-clients = {}
+clients_connections = {}
+clients_UDP = {}
 
 def close_connections():
-    for nick, sock in clients.items():
-        sock.send(quit_msg.encode())
-        sock.close()
+    for nick, conn in clients_connections.items():
+        conn.send(quit_msg.encode())
+        conn.close()
         print('Connection with ' + nick + ' closed.')
 
 class ClientThread(threading.Thread):
@@ -61,18 +63,18 @@ class ClientThread(threading.Thread):
                 return
     
     def send_everyone(self, msg):
-        for nick, sock in clients.items():
+        for nick, conn in clients_connections.items():
             if nick != self.client_nick:
-                sock.send((self.client_nick + ': ' + msg).encode())
+                conn.send((self.client_nick + ': ' + msg).encode())
 
     def close_connection(self):
-        clients.pop(self.client_nick)
+        clients_connections.pop(self.client_nick)
         try:
             self.client_socket.close()
         except:
             print('Already closed')
         print(self.client_nick + ' disconnected!')
-        print('Klienci online: ' + str(len(clients)))
+        print('Klienci online: ' + str(len(clients_connections)))
 
 inputs = [TCP_socket, UDP_socket]
 outputs = [TCP_socket]
@@ -91,13 +93,23 @@ while True:
             connection, client_address = s.accept()
             client_nick = connection.recv(1024).decode()
             print(client_nick + ' connected!')
-            clients[client_nick] = connection
+            clients_connections[client_nick] = connection
             # Starting new thread for connected client
             ClientThread(connection, client_nick).start()
-            print('Klienci online: ' + str(len(clients)))
+            print('Klienci online: ' + str(len(clients_connections)))
         else:
             data, address = s.recvfrom(1024)
             print('Got UDP data from: ' + str(address))
-            print(data.decode())
-            UDP_socket.sendto(data, address)
+            msg = data.decode()
+            if msg[:3] == nick_UDP_msg:
+                clients_UDP[msg[3:]] = address
+            else:
+                nick = ''
+                for n, add in clients_UDP.items():
+                    if add == address:
+                        nick = n
+                        break
+                for add in clients_UDP.values():
+                    if add != address:
+                        UDP_socket.sendto((nick + ': ').encode() + data, add)
 

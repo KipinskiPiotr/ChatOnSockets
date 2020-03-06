@@ -2,6 +2,7 @@ import socket, threading, select
 
 server_address = ("127.0.0.1", 9009)
 quit_msg = "#Q#"
+nick_UDP_msg = '#N#'
 
 nick = input('Type your nick: ')
 
@@ -15,6 +16,8 @@ UDP_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 # Send nick and receive confirmation
 TCP_socket.send(nick.encode())
 print(TCP_socket.recv(1024).decode())
+UDP_socket.sendto((nick_UDP_msg + nick).encode(), server_address)
+#print(UDP_socket.recv(1024).decode())
 
 def disconnect():
     try:
