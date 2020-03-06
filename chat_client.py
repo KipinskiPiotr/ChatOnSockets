@@ -5,33 +5,42 @@ quit_msg = "#Q#"
 
 nick = input('Type your nick: ')
 
-socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-socket.connect(server_address)
-socket.send(nick.encode())
-print(socket.recv(1024).decode())
+# TCP socket
+TCP_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+TCP_socket.connect(server_address)
+
+# UDP socket
+UDP_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+# Send nick and receive confirmation
+TCP_socket.send(nick.encode())
+print(TCP_socket.recv(1024).decode())
 
 def disconnect():
     try:
-        socket.send(quit_msg.encode())
-        socket.close()
+        TCP_socket.send(quit_msg.encode())
+        TCP_socket.close()
         print('Disconnected')
     except OSError:
         print('Socket already closed')
 
 msg_queue = []
-inputs = [socket]
-outputs = [socket]
-errors = [socket]
 
 interrupted = False
 
 class ReceiveThread(threading.Thread):
-    def __init__(self, client_socket):
+    def __init__(self, TCP_socket, UDP_socket):
         threading.Thread.__init__(self)
-        self.socket = socket
+        self.TCP_socket = TCP_socket
+        self.UDP_socket = UDP_socket
 
     def run(self):
         global interrupted
+
+        inputs = [self.TCP_socket, self.UDP_socket]
+        outputs = [self.TCP_socket]
+        errors = [self.TCP_socket]
+
         while True:
             if interrupted:
                 disconnect()
@@ -65,8 +74,8 @@ class ReceiveThread(threading.Thread):
                 interrupted = True
                 return
 
-socket.setblocking(0)
-ReceiveThread(socket).start()
+TCP_socket.setblocking(0)
+ReceiveThread(TCP_socket, UDP_socket).start()
 
 while not interrupted:
     try:
@@ -74,4 +83,7 @@ while not interrupted:
     except KeyboardInterrupt:
         interrupted = True
 
-    msg_queue.append(msg)
+    if msg == 'U':
+        UDP_socket.sendto('ASCII ART HERE'.encode(), server_address)
+    else:
+        msg_queue.append(msg)

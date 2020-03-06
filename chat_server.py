@@ -1,11 +1,16 @@
 import socket, threading, select
 
-server_port = 9009
-server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_socket.bind(('', server_port))
-server_socket.listen()
-
+address = ('', 9009)
 quit_msg = '#Q#'
+
+# TCP socket
+TCP_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+TCP_socket.bind(address)
+TCP_socket.listen()
+
+# UDP socket
+UDP_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+UDP_socket.bind(address)
 
 print('Waiting for clients')
 clients = {}
@@ -69,37 +74,30 @@ class ClientThread(threading.Thread):
         print(self.client_nick + ' disconnected!')
         print('Klienci online: ' + str(len(clients)))
 
-inputs = [server_socket]
-outputs = [server_socket]
-errors = [server_socket]
+inputs = [TCP_socket, UDP_socket]
+outputs = [TCP_socket]
+errors = [TCP_socket]
 
 while True:
     try:
         readable, writable, err = select.select(inputs, outputs, errors, 1)
     except KeyboardInterrupt:
         close_connections()
-        server_socket.close()
+        TCP_socket.close()
         break
 
     for s in readable:
-        if s is server_socket:
+        if s is TCP_socket:
             connection, client_address = s.accept()
             client_nick = connection.recv(1024).decode()
             print(client_nick + ' connected!')
             clients[client_nick] = connection
+            # Starting new thread for connected client
             ClientThread(connection, client_nick).start()
             print('Klienci online: ' + str(len(clients)))
         else:
-            data = s.recv(1024)
+            data, address = s.recvfrom(1024)
+            print('Got UDP data from: ' + str(address))
+            print(data.decode())
+            UDP_socket.sendto(data, address)
 
-# while True:
-#     try:
-#         (client_socket, address) = server_socket.accept()
-#         client_nick = client_socket.recv(1024).decode()
-#     except KeyboardInterrupt:
-#         close_connections()
-#         break
-#     print(client_nick + ' connected!')
-#     clients[client_nick] = client_socket
-#     ClientThread(client_socket, client_nick).start()
-#     print('Klienci online: ' + str(len(clients)))
