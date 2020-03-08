@@ -40,7 +40,7 @@ class ClientThread(threading.Thread):
 
         while True:
             try:
-                readable, writable, err = select.select(inputs, outputs, errors, 5)
+                readable, writable, err = select.select(inputs, outputs, errors, 1)
             except ValueError:
                 break
 
@@ -86,6 +86,7 @@ while True:
     except KeyboardInterrupt:
         close_connections()
         TCP_socket.close()
+        UDP_socket.close()
         break
 
     for s in readable:
@@ -98,7 +99,7 @@ while True:
             ClientThread(connection, client_nick).start()
             print('Klienci online: ' + str(len(clients_connections)))
         else:
-            data, address = s.recvfrom(1024)
+            data, address = s.recvfrom(1024)                
             print('Got UDP data from: ' + str(address))
             msg = data.decode()
             if msg[:3] == nick_UDP_msg:
