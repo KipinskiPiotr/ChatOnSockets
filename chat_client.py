@@ -1,8 +1,28 @@
-import socket, threading, select
+import socket, threading, select, struct
+
+MCAST_GRP = '224.1.1.1'
+MCAST_PORT = 5007
 
 server_address = ("127.0.0.1", 9009)
 quit_msg = "#Q#"
 nick_UDP_msg = '#N#'
+ascii_art = """
+                                                     _:_
+                                                    '-.-'
+                                           ()      __.'.__
+                                        .-:--:-.  |_______|
+                                 ()      \____/    \=====/
+                                 /\      {====}     )___(
+                      (\=,      //\\\\      )__(     /_____\\
+      __    |'-'-'|  //  .\    (    )    /____\     |   |
+     /  \   |_____| (( \_  \    )__(      |  |      |   |
+     \__/    |===|   ))  `\_)  /____\     |  |      |   |
+    /____\   |   |  (/     \    |  |      |  |      |   |
+     |  |    |   |   | _.-'|    |  |      |  |      |   |
+     |__|    )___(    )___(    /____\    /____\    /_____\\
+    (====)  (=====)  (=====)  (======)  (======)  (=======)
+    }===={  }====={  }====={  }======{  }======{  }======={
+jgs(______)(_______)(_______)(________)(________)(_________)"""
 
 nick = input('Type your nick: ')
 
@@ -12,6 +32,14 @@ TCP_socket.connect(server_address)
 
 # UDP socket
 UDP_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+# Multicast socket
+MC_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+MC_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+MC_socket.bind(('', MCAST_PORT))
+mreq = struct.pack("4sl", socket.inet_aton(MCAST_GRP), socket.INADDR_ANY)
+MC_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+
 
 # Send nick and receive confirmation
 TCP_socket.send(nick.encode())
@@ -32,15 +60,16 @@ msg_queue = []
 interrupted = False
 
 class ReceiveThread(threading.Thread):
-    def __init__(self, TCP_socket, UDP_socket):
+    def __init__(self, TCP_socket, UDP_socket, MC_socket):
         threading.Thread.__init__(self)
         self.TCP_socket = TCP_socket
         self.UDP_socket = UDP_socket
+        self.MC_socket = MC_socket
 
     def run(self):
         global interrupted
 
-        inputs = [self.TCP_socket, self.UDP_socket]
+        inputs = [self.TCP_socket, self.UDP_socket, self.MC_socket]
         outputs = [self.TCP_socket]
         errors = [self.TCP_socket]
 
@@ -57,14 +86,19 @@ class ReceiveThread(threading.Thread):
             for s in readable:
                 try:
                     msg = s.recv(1024).decode()
-                    if msg == quit_msg:
-                        disconnect()
-                        interrupted = True
-                        return
-                    print("\r" + msg)
-                    print(nick + ': ', end='', flush=True)
                 except OSError:
                     disconnect()
+
+                if s is self.MC_socket:
+                    if msg[:len(nick) + 1] == nick + ':':
+                        continue
+            
+                if msg == quit_msg:
+                    disconnect()
+                    interrupted = True
+                    return
+                print("\r" + msg)
+                print(nick + ': ', end='', flush=True)
 
             for s in writable:
                 for msg in msg_queue:
@@ -78,7 +112,7 @@ class ReceiveThread(threading.Thread):
                 return
 
 TCP_socket.setblocking(0)
-ReceiveThread(TCP_socket, UDP_socket).start()
+ReceiveThread(TCP_socket, UDP_socket, MC_socket).start()
 
 while not interrupted:
     try:
@@ -87,6 +121,8 @@ while not interrupted:
         interrupted = True
 
     if msg == 'U':
-        UDP_socket.sendto('ASCII ART HERE'.encode(), server_address)
+        UDP_socket.sendto(ascii_art.encode(), server_address)
+    elif msg == 'M':
+        UDP_socket.sendto((nick + ': ' + ascii_art).encode(), (MCAST_GRP, MCAST_PORT))
     else:
         msg_queue.append(msg)
