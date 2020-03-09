@@ -24,24 +24,24 @@ def close_connections():
         print('Connection with ' + nick + ' closed.')
 
 class ClientThread(threading.Thread):
-    def __init__(self, client_socket, client_nick):
+    def __init__(self, tcp_connection, client_nick):
         threading.Thread.__init__(self)
-        self.client_socket = client_socket
+        self.tcp_connection = tcp_connection
         self.client_nick = client_nick
-        self.client_socket.send(("Welcome to chat " + self.client_nick).encode())
+        self.tcp_connection.send(("Welcome to chat " + self.client_nick).encode())
 
     def run(self):
         msg_queue = []
-        inputs = [self.client_socket]
-        outputs = [self.client_socket]
-        errors = [self.client_socket]
+        inputs = [self.tcp_connection]
+        outputs = [self.tcp_connection]
+        errors = [self.tcp_connection]
 
-        self.client_socket.setblocking(0)
+        self.tcp_connection.setblocking(0)
 
         while True:
             try:
                 readable, writable, err = select.select(inputs, outputs, errors, 1)
-            except ValueError:
+            except (ValueError, OSError):
                 break
 
             for s in readable:
@@ -70,7 +70,7 @@ class ClientThread(threading.Thread):
     def close_connection(self):
         clients_connections.pop(self.client_nick)
         try:
-            self.client_socket.close()
+            self.tcp_connection.close()
         except:
             print('Already closed')
         print(self.client_nick + ' disconnected!')

@@ -81,7 +81,7 @@ class ReceiveThread(threading.Thread):
             try:
                 readable, writable, err = select.select(inputs, outputs, errors, 1)
             except (ValueError, OSError):
-                exit()
+                break
 
             for s in readable:
                 try:
@@ -97,7 +97,11 @@ class ReceiveThread(threading.Thread):
                     disconnect()
                     interrupted = True
                     return
-                print("\r" + msg)
+                
+                if len(msg) < len(nick) + 2:
+                    print("\r" + msg + ' ' * (len(nick) + 2 - len(msg)))
+                else:
+                    print("\r" + msg)
                 print(nick + ': ', end='', flush=True)
 
             for s in writable:
