@@ -40,7 +40,6 @@ MC_socket.bind(('', MCAST_PORT))
 mreq = struct.pack("4sl", socket.inet_aton(MCAST_GRP), socket.INADDR_ANY)
 MC_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-
 # Send nick and receive confirmation
 TCP_socket.send(nick.encode())
 print(TCP_socket.recv(1024).decode())
@@ -94,7 +93,8 @@ class ReceiveThread(threading.Thread):
                         continue
             
                 if msg == quit_msg:
-                    disconnect()
+                    TCP_socket.close()
+                    print("Server closed")
                     interrupted = True
                     return
                 

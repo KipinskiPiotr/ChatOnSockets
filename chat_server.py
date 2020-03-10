@@ -99,7 +99,11 @@ while True:
             ClientThread(connection, client_nick).start()
             print('Klienci online: ' + str(len(clients_connections)))
         else:
-            data, address = s.recvfrom(1024)                
+            try:
+                data, address = s.recvfrom(1024) 
+            except OSError:
+                print("Error receiving UDP data")
+                continue            
             print('Got UDP data from: ' + str(address))
             msg = data.decode()
             if msg[:3] == nick_UDP_msg:
